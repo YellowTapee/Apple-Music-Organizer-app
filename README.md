@@ -27,6 +27,16 @@ No Apple Developer membership, MusicKit or cloud account is used.
 
 ## Run it (on your Mac)
 
+### Listening while selecting
+
+Click **▶ Preview** beside a song. The shared player plays one Apple catalog clip
+at a time, with pause and seeking controls. Some songs/versions have no matching
+preview; the app says so rather than substituting a differently titled version.
+Safari may require pressing Play in the audio controls after the lookup finishes.
+Preview lookup sends only the clicked song's title and artist to Apple's Search
+API; no library is uploaded. These previews are catalog clips, not full playback.
+Previewing never selects a song or marks it organized.
+
 ### Picking songs and tracking progress
 
 Choose a source playlist, then either select artists or use **Browse all songs**.
@@ -145,7 +155,8 @@ web/ (UI)  ->  helper/server.js (127.0.0.1 only)  ->  helper/music-adapter.js  -
 
 ## Privacy and data
 
-- Everything stays on your Mac. No analytics, accounts, servers or uploads.
+- Library organization stays on your Mac. No analytics or accounts. On-demand
+  preview requests send the clicked title/artist to Apple and stream Apple's clip.
 - The browser tab remembers only your last playlist choice, selected artist names and two
   options, in `sessionStorage` (cleared when the tab closes, or with "Clear saved
   selections"). Organizing progress separately saves source-playlist and copied-song

@@ -40,6 +40,46 @@ const state = {
 
 const $app = document.getElementById('app');
 const $dialog = document.getElementById('confirm-dialog');
+const previewAudio = document.getElementById('preview-audio');
+let previewRequest = 0;
+
+function closePreview() {
+  previewRequest++;
+  previewAudio.pause();
+  previewAudio.removeAttribute('src');
+  previewAudio.load();
+  document.getElementById('preview-player').hidden = true;
+}
+
+async function playPreview(position) {
+  const track = state.tracks[position];
+  if (!track) return;
+  closePreview();
+  const request = previewRequest;
+  const panel = document.getElementById('preview-player');
+  const message = document.getElementById('preview-message');
+  const link = document.getElementById('preview-source');
+  panel.hidden = false;
+  link.hidden = true;
+  message.textContent = `Finding preview: ${track.title} — ${track.artist}…`;
+  try {
+    const { preview } = await api('/api/preview?' + new URLSearchParams({ title: track.title || '', artist: track.artist || '', album: track.album || '' }));
+    if (request !== previewRequest) return;
+    if (!preview) { message.textContent = 'Preview unavailable for this song/version.'; return; }
+    message.textContent = `${preview.title} — ${preview.artist} · Apple Music preview`;
+    link.href = preview.trackUrl;
+    link.hidden = false;
+    previewAudio.src = preview.previewUrl;
+    try { await previewAudio.play(); }
+    catch { if (request === previewRequest) message.textContent += ' · Press Play below to listen.'; }
+  } catch (error) {
+    if (request === previewRequest) message.textContent = error.message;
+  }
+}
+document.getElementById('close-preview').addEventListener('click', closePreview);
+previewAudio.addEventListener('error', () => {
+  if (previewAudio.hasAttribute('src')) document.getElementById('preview-message').textContent = 'This preview could not be played. Try another song.';
+});
 
 // ---------- helpers ----------
 
@@ -280,6 +320,7 @@ function trackRow(m, removable) {
   return `<li class="track"><span class="pos">${m.position + 1}</span>
     <span class="meta"><span class="title">${esc(m.track.title)}${badges}</span>
       <span class="sub">${esc(m.track.artist)}${m.track.album ? ' · ' + esc(m.track.album) : ''}</span></span>
+    <button class="btn btn-sm" data-action="preview-song" data-position="${m.position}" aria-label="Preview ${esc(m.track.title)}">▶ Preview</button>
     ${removable ? `<label class="check"><input type="checkbox" data-track-position="${m.position}" ${state.removed.has(m.position) ? '' : 'checked'} aria-label="Include ${esc(m.track.title)}">Include</label>` : ''}</li>`;
 }
 
@@ -395,6 +436,7 @@ function render() {
 }
 
 function go(step, { focus = true } = {}) {
+  closePreview();
   state.step = step;
   render();
   if (focus) $app.querySelector('h2')?.focus();
@@ -531,6 +573,7 @@ $app.addEventListener('click', (ev) => {
   const btn = ev.target.closest('[data-action]');
   if (!btn || btn.disabled) return;
   const a = btn.dataset.action;
+  if (a === 'preview-song') { playPreview(Number(btn.dataset.position)); return; }
   if (a === 'retry-status' || a === 'reload') loadPlaylists();
   else if (a === 'to-artists') toArtists();
   else if (a === 'to-review' && state.selected.size > 0) {

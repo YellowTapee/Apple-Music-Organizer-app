@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMusicAdapter, MusicError } from './music-adapter.js';
+import { createPreviewLookup } from './previews.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATIC = { '/src/': path.join(ROOT, 'src'), '/': path.join(ROOT, 'web') };
@@ -68,6 +69,7 @@ export function validateCopyRequest(body, existingNames) {
 }
 
 export function createServer({ adapter = createMusicAdapter(), port = 4173 } = {}) {
+  const previewLookup = createPreviewLookup();
   let writeInFlight = false; // blocks double submissions
   const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 
@@ -90,6 +92,14 @@ export function createServer({ adapter = createMusicAdapter(), port = 4173 } = {
         }
         if (req.method === 'GET' && url.pathname === '/api/status') {
           return send(res, 200, await adapter.status());
+        }
+        if (req.method === 'GET' && url.pathname === '/api/preview') {
+          try {
+            const preview = await previewLookup(Object.fromEntries(url.searchParams));
+            return send(res, 200, { preview });
+          } catch (error) {
+            return send(res, 502, { error: { code: 'preview-unavailable', message: error.message } });
+          }
         }
         if (req.method === 'GET' && url.pathname === '/api/playlists') {
           return send(res, 200, { playlists: await adapter.listPlaylists() });
@@ -149,7 +159,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const port = Number(process.env.PORT) || 4173;
   createServer({ port }).listen(port, '127.0.0.1', () => {
     console.log(`Apple Music Organizer helper running at http://127.0.0.1:${port}`);
-    console.log('Local only. Nothing leaves this computer.');
+    console.log('Library operations run locally. Preview searches contact Apple on demand.');
   });
 }
 
