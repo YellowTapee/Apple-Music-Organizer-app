@@ -122,3 +122,5 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
   .actions .btn { flex: 1; }
 }
 
+ .playlist-toggle[aria-pressed="true"] { background: #a42649; border-color: #f16b8c; color: #fff; }
+ .playlist-toggle[aria-pressed="false"] { opacity: .75; }

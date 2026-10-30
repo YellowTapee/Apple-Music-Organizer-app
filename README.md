@@ -175,3 +175,15 @@ The matching module is independent of the UI, so a second tab can be added later
 - Smart playlists can be read as a source; special system playlists are hidden.
 - Cancel is possible before confirming; once copying starts it can't be stopped.
 
+# Three-playlist sorting and playback
+
+In song review, name up to three playlists and toggle Playlist 1, Playlist 2,
+and Playlist 3 beside each song. Each button is independent. Empty selections
+are skipped; the confirmation shows each destination and song count. Copying
+runs separately for each destination and reports its own successes and failures.
+Only confirmed copied tracks are saved as organized, even after refresh.
+
+Play in Music asks the local Mac Music app to play the exact source track,
+checking the track ID first. Pause Music pauses it without leaving the organizer.
+Catalog Preview remains available too. Real Mac playback needs verification.
+

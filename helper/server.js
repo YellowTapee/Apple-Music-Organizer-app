@@ -104,6 +104,14 @@ export function createServer({ adapter = createMusicAdapter(), port = 4173 } = {
         if (req.method === 'GET' && url.pathname === '/api/playlists') {
           return send(res, 200, { playlists: await adapter.listPlaylists() });
         }
+        if (req.method === 'POST' && (url.pathname === '/api/play' || url.pathname === '/api/pause')) {
+          if (!String(req.headers['content-type'] || '').startsWith('application/json')) return send(res, 415, { error: { code: 'invalid', message: 'Use application/json' } });
+          const body = await readJson(req);
+          if (writeInFlight) return send(res, 409, { error: { code: 'busy', message: 'Wait for copying to finish before controlling playback.' } });
+          if (url.pathname === '/api/pause') return send(res, 200, await adapter.pause());
+          if (typeof body.sourceId !== 'string' || !body.sourceId || typeof body.id !== 'string' || !body.id || !Number.isInteger(body.position) || body.position < 0) return send(res, 400, { error: { code: 'invalid', message: 'Select a song with a valid Music ID.' } });
+          return send(res, 200, await adapter.playTrack(body));
+        }
         const m = url.pathname.match(/^\/api\/playlists\/([^/]+)\/tracks$/);
         if (req.method === 'GET' && m) {
           return send(res, 200, await adapter.readPlaylist(decodeURIComponent(m[1])));

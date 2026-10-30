@@ -29,6 +29,9 @@ const state = {
   includeFeatured: false,
   duplicates: 'skip',
   removed: new Set(),
+  extraSelections: [new Set(), new Set()],
+  extraNames: ['', ''],
+  batchReports: null,
   onlyPositions: null, // set when retrying only failed tracks
   destName: '',
   previewOnly: false,
@@ -63,6 +66,8 @@ async function playPreview(position) {
   link.hidden = true;
   message.textContent = `Finding preview: ${track.title} — ${track.artist}…`;
   try {
+    await api('/api/pause', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    if (request !== previewRequest) return;
     const { preview } = await api('/api/preview?' + new URLSearchParams({ title: track.title || '', artist: track.artist || '', album: track.album || '' }));
     if (request !== previewRequest) return;
     if (!preview) { message.textContent = 'Preview unavailable for this song/version.'; return; }
@@ -77,6 +82,13 @@ async function playPreview(position) {
   }
 }
 document.getElementById('close-preview').addEventListener('click', closePreview);
+document.getElementById('pause-music').addEventListener('click', async () => {
+  previewAudio.pause();
+  try {
+    await api('/api/pause', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    document.getElementById('preview-message').textContent = 'Playback paused.';
+  } catch (e) { document.getElementById('preview-message').textContent = e.message; }
+});
 previewAudio.addEventListener('error', () => {
   if (previewAudio.hasAttribute('src')) document.getElementById('preview-message').textContent = 'This preview could not be played. Try another song.';
 });
@@ -142,6 +154,43 @@ function computeMatches() {
   let matches = result.matches.filter((m) => !state.removed.has(m.position));
   if (state.onlyPositions) matches = matches.filter((m) => state.onlyPositions.has(m.position));
   return { matches, skippedDuplicates: result.skippedDuplicates };
+}
+
+function playlistBatches() {
+  const first = computeMatches();
+  const available = candidates().matches;
+  return [
+    { name: state.destName, matches: first.matches, skippedDuplicates: first.skippedDuplicates },
+    ...state.extraSelections.map((selected, i) => ({ name: state.extraNames[i], matches: available.filter(m => selected.has(m.position)), skippedDuplicates: [] })),
+  ].filter(b => b.matches.length);
+}
+
+function batchProblem() {
+  const batches = playlistBatches();
+  if (!batches.length) return 'Select at least one song.';
+  for (const b of batches) {
+    const problem = nameProblem(b.name);
+    if (problem) return problem;
+    if (b.matches.some(m => !m.track.id)) return 'A selected song has no Music ID. Deselect it to continue.';
+  }
+  if (new Set(batches.map(b => normalize(b.name))).size !== batches.length) return 'Give each playlist a different name.';
+  return null;
+}
+
+async function playLibrarySong(position) {
+  const track = state.tracks[position];
+  if (!track) return;
+  closePreview();
+  const request = previewRequest;
+  const panel = document.getElementById('preview-player');
+  panel.hidden = false;
+  document.getElementById('preview-source').hidden = true;
+  const message = document.getElementById('preview-message');
+  message.textContent = `Playing in Apple Music: ${track.title} — ${track.artist}…`;
+  try {
+    await api('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceId: state.playlistId, position, id: track.id }) });
+    if (request === previewRequest) message.textContent = `Playing in Apple Music: ${track.title} — ${track.artist}`;
+  } catch (e) { if (request === previewRequest) message.textContent = e.message; }
 }
 
 function uniqueName(base) {
@@ -321,7 +370,8 @@ function trackRow(m, removable) {
     <span class="meta"><span class="title">${esc(m.track.title)}${badges}</span>
       <span class="sub">${esc(m.track.artist)}${m.track.album ? ' · ' + esc(m.track.album) : ''}</span></span>
     <button class="btn btn-sm" data-action="preview-song" data-position="${m.position}" aria-label="Preview ${esc(m.track.title)}">▶ Preview</button>
-    ${removable ? `<label class="check"><input type="checkbox" data-track-position="${m.position}" ${state.removed.has(m.position) ? '' : 'checked'} aria-label="Include ${esc(m.track.title)}">Include</label>` : ''}</li>`;
+    <button class="btn btn-sm" data-action="play-song" data-position="${m.position}">▶ Play in Music</button>
+    ${removable ? [0, 1, 2].map(i => `<button class="btn btn-sm playlist-toggle" data-action="toggle-playlist" data-slot="${i}" data-position="${m.position}" aria-pressed="${i === 0 ? !state.removed.has(m.position) : state.extraSelections[i - 1].has(m.position)}" aria-label="Include ${esc(m.track.title)} in playlist ${i + 1}">Playlist ${i + 1}</button>`).join('') : ''}</li>`;
 }
 
 function screenReview() {
@@ -330,7 +380,7 @@ function screenReview() {
   const shown = filterSongs(available, state.songSearch);
   const organizedCount = state.tracks.filter(t => (state.organized[state.playlistId] || []).includes(String(t.id))).length;
   const uncertain = matches.filter((m) => m.uncertain).length;
-  const noId = matches.filter((m) => !m.track.id).length;
+  const noId = playlistBatches().flatMap(b => b.matches).filter(m => !m.track.id).length;
   return `<h2 tabindex="-1">Review matching songs</h2>
     ${sourceCard()}
     <label for="song-search">Search songs or artists</label>
@@ -339,8 +389,8 @@ function screenReview() {
     <p class="muted">Organized songs are hidden here after successful copying. They stay in Apple Music. This progress is saved only in this browser on this Mac.</p>
     ${state.storageWarning ? `<p role="alert">${esc(state.storageWarning)}</p>` : ''}
     ${organizedCount ? '<button class="btn btn-sm" data-action="reset-organized">Reset organizing progress for this playlist</button>' : ''}
-    <p><b>${matches.length}</b> of ${available.length} matching songs selected, in original playlist order.</p>
-    <p class="muted">Check the songs you want in your new playlist. Unchecked songs stay here so you can select them again.</p>
+    <div class="card"><p>Choose up to three new playlists. A highlighted button includes that song; click again to remove it. Songs can go in more than one.</p>
+    ${[0, 1, 2].map(i => `<label for="playlist-name-${i}">Playlist ${i + 1} name</label><input id="playlist-name-${i}" data-playlist-name="${i}" value="${esc(i === 0 ? state.destName : state.extraNames[i - 1])}" maxlength="200" placeholder="Name playlist ${i + 1}"><p class="muted">${i === 0 ? matches.length : available.filter(m => state.extraSelections[i - 1].has(m.position)).length} songs selected</p><button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="true">Select all shown for ${i + 1}</button> <button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="false">Clear shown for ${i + 1}</button>`).join('')}</div>
     ${uncertain ? `<div class="banner banner-warn" role="status"><b>${uncertain} uncertain match${uncertain === 1 ? '' : 'es'}.</b> Their artist name has more than one name in it (for example “A &amp; B”). Check them, and remove any that don't belong.</div>` : ''}
     ${noId ? `<div class="banner banner-error" role="alert"><b>${noId} track${noId === 1 ? ' has' : 's have'} no Apple Music ID</b> and can't be copied safely. Remove ${noId === 1 ? 'it' : 'them'} to continue.</div>` : ''}
     <label for="dups">Duplicate tracks</label>
@@ -349,33 +399,33 @@ function screenReview() {
       <option value="allow" ${state.duplicates === 'allow' ? 'selected' : ''}>Allow duplicates</option>
     </select>
     ${skippedDuplicates.length ? `<p class="muted">${skippedDuplicates.length} duplicate${skippedDuplicates.length === 1 ? '' : 's'} will be skipped.</p>` : ''}
-    <div class="actions"><button class="btn" data-action="select-all-tracks">${state.songSearch ? 'Select all shown' : 'Select all'}</button><button class="btn" data-action="deselect-all-tracks">${state.songSearch ? 'Deselect all shown' : 'Deselect all'}</button></div>
     <p class="muted">${shown.length} songs shown. Search filters the list without clearing your selections.</p>
     ${shown.length === 0 ? '<div class="empty"><p>No songs shown. Clear the search, show organized songs, or change artists.</p></div>' : ''}
     <ul class="list" aria-label="Matching tracks">${shown.map((m) => trackRow(m, true)).join('')}</ul>
     <div class="actions"><button class="btn" data-action="back">Back</button>
       <span class="spacer"></span>
-      <button class="btn btn-primary" data-action="to-confirm" ${matches.length === 0 || noId ? 'disabled' : ''}>Continue</button></div>`;
+      <button class="btn btn-primary" data-action="to-confirm" ${playlistBatches().length === 0 || noId ? 'disabled' : ''}>Continue</button></div>`;
 }
 
 function screenConfirm() {
   const { matches } = computeMatches();
-  const problem = nameProblem(state.destName);
+  const problem = batchProblem();
   const preview = state.previewOnly;
   return `<h2 tabindex="-1">Name and confirm</h2>
     ${sourceCard()}
-    <div class="card dest"><span class="tag tag-dest">New playlist (will be created)</span>
+    ${playlistBatches().map(b => `<div class="card dest"><b>${esc(b.name)}</b><p>${b.matches.length} songs will be copied.</p></div>`).join('')}
+    <div class="card dest" hidden><span class="tag tag-dest">Playlist 1 name</span>
       <label for="dest">Playlist name</label>
       <input type="text" id="dest" value="${esc(state.destName)}" maxlength="200" autocomplete="off" ${state.copying ? 'disabled' : ''}
         aria-describedby="dest-problem">
       <p class="banner banner-error" id="dest-problem" role="alert" ${problem ? '' : 'hidden'}>${esc(problem || '')}</p>
-      <p><b>${matches.length}</b> song${matches.length === 1 ? '' : 's'} will be copied.${state.onlyPositions ? ' <span class="muted">(retrying only the tracks that failed)</span>' : ''}</p></div>
+      <p class="muted">Go Back to change all three names and selections. Playlists with no selections are skipped.</p></div>
     <div class="banner banner-info">Your source playlist, <b>${esc(state.sourceName)}</b>, will <b>not</b> be changed. Nothing is deleted.</div>
     <label class="check"><input type="checkbox" id="preview" ${preview ? 'checked' : ''} ${state.copying ? 'disabled' : ''}>
       Preview only: don't create anything in Music</label>
     ${state.copyError ? copyErrorBanner() : ''}
     <div class="actions"><button class="btn" data-action="back" ${state.copying ? 'disabled' : ''}>Back</button>
-      <button class="btn btn-primary" id="copy-btn" data-action="copy" ${problem || state.copying || matches.length === 0 ? 'disabled' : ''}>
+      <button class="btn btn-primary" id="copy-btn" data-action="copy" ${problem || state.copying ? 'disabled' : ''}>
         ${state.copying ? 'Copying… please wait' : preview ? 'Show preview' : 'Copy Tracks'}</button></div>`;
 }
 
@@ -389,6 +439,11 @@ function copyErrorBanner() {
 
 function screenResults() {
   const r = state.report;
+  if (state.batchReports) return `<h2 tabindex="-1">Results</h2>
+    ${state.storageWarning ? `<p role="alert">${esc(state.storageWarning)}</p>` : ''}
+    ${state.batchReports.map(({ name, report, error }) => `<div class="card"><h3>${esc(name)}</h3>${error ? `<p role="alert">${esc(error)} Check this playlist in Music before retrying; its result could not be verified.</p>` : `<p>${report.copiedCount} copied · ${report.failedCount} failed</p>${report.aborted ? `<p role="alert">${esc(report.aborted)}</p>` : ''}${report.failed.length ? `<ul>${report.failed.map(f => `<li>${esc(f.track.title)} — ${esc(f.reason)}</li>`).join('')}</ul>` : ''}<p>${report.sourceUnchanged === true ? 'Source playlist checked: unchanged.' : 'Check the source playlist in Music; it could not be confirmed unchanged.'}</p>`}</div>`).join('')}
+    <p>Successfully copied songs are saved as organized. Check each result above before continuing.</p>
+    <button class="btn btn-primary" data-action="restart">Start another</button>`;
   if (state.previewShown) {
     const { matches, skippedDuplicates } = state.previewShown;
     return `<h2 tabindex="-1">Preview only</h2>
@@ -454,6 +509,9 @@ async function toArtists() {
     state.tracks = data.tracks;
     state.sourceName = data.name;
     state.removed = new Set();
+    state.extraSelections = [new Set(), new Set()];
+    state.extraNames = ['', ''];
+    state.batchReports = null;
     state.onlyPositions = null;
     state.report = null;
     state.previewShown = null;
@@ -480,24 +538,24 @@ function toConfirm() {
     state.autoName = defaultDestName();
     state.destName = state.autoName;
   }
+  state.extraNames = state.extraNames.map((name, i) => name || uniqueName(`${state.sourceName} — Playlist ${i + 2}`.slice(0, 190)));
   go(4);
 }
 
 function startCopy() {
   if (state.copying) return;
   const { matches } = computeMatches();
-  const problem = nameProblem(state.destName);
-  if (problem || matches.length === 0) return;
+  const problem = batchProblem();
+  if (problem) return;
   if (state.previewOnly) {
-    state.previewShown = computeMatches();
+    state.previewShown = { matches: playlistBatches().flatMap(b => b.matches), skippedDuplicates: [] };
     state.report = null;
     go(5);
     return;
   }
   document.getElementById('confirm-body').innerHTML = `
     <div class="card source"><span class="tag tag-source">Source (unchanged)</span><p class="name">${esc(state.sourceName)}</p></div>
-    <div class="card dest"><span class="tag tag-dest">New playlist</span><p class="name">${esc(state.destName.trim())}</p>
-      <p><b>${matches.length}</b> song${matches.length === 1 ? '' : 's'} will be copied into it.</p></div>
+    ${playlistBatches().map(b => `<div class="card dest"><p class="name">${esc(b.name.trim())}</p><p>${b.matches.length} songs</p></div>`).join('')}
     <p>This creates a new playlist in your Music library. It can't be cancelled once it starts.</p>`;
   $dialog.returnValue = '';
   $dialog.showModal();
@@ -505,38 +563,34 @@ function startCopy() {
 
 async function doCopy() {
   if (state.copying) return;
-  const { matches, skippedDuplicates } = computeMatches();
+  if (batchProblem()) return;
+  const batches = playlistBatches();
+  state.batchReports = [];
   state.copying = true;
   state.copyError = null;
   render();
-  try {
-    const helperResult = await api('/api/copy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        confirm: true,
-        sourceId: state.playlistId,
-        destName: state.destName.trim(),
-        tracks: matches.map((m) => ({ position: m.position, id: m.track.id })),
-      }),
-    });
-    state.report = buildReport({ requested: matches, skippedDuplicates, helperResult });
-    state.organized = recordCopied(state.organized, state.playlistId, state.report.copied);
-    try { localStorage.setItem(ORGANIZED_KEY, JSON.stringify(state.organized)); }
-    catch { state.storageWarning = 'Progress could not be saved. Keep this tab open; organized songs may reappear next time.'; }
-    state.copying = false;
-    // The new playlist now exists; refresh the list so name checks stay correct.
-    api('/api/playlists').then((p) => { state.playlists = p.playlists; }).catch(() => {});
-    go(5);
-  } catch (e) {
-    state.copying = false;
-    state.copyError = e;
-    await refreshStatus();
-    render();
+  for (const batch of batches) {
+    try {
+      const helperResult = await api('/api/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true, sourceId: state.playlistId, destName: batch.name.trim(), tracks: batch.matches.map(m => ({ position: m.position, id: m.track.id })) }) });
+      const report = buildReport({ requested: batch.matches, skippedDuplicates: batch.skippedDuplicates, helperResult });
+      state.batchReports.push({ name: batch.name, report });
+      state.organized = recordCopied(state.organized, state.playlistId, report.copied);
+      try { localStorage.setItem(ORGANIZED_KEY, JSON.stringify(state.organized)); }
+      catch { state.storageWarning = 'Progress could not be saved. Organized songs may reappear next time.'; }
+    } catch (e) {
+      state.batchReports.push({ name: batch.name, error: e.message });
+    }
   }
+  state.copying = false;
+  api('/api/playlists').then(p => { state.playlists = p.playlists; }).catch(() => {});
+  go(5);
 }
 
+
 function restart() {
+  state.extraSelections = [new Set(), new Set()];
+  state.extraNames = ['', ''];
+  state.batchReports = null;
   state.mode = 'artists';
   state.songSearch = '';
   state.tracks = [];
@@ -573,6 +627,21 @@ $app.addEventListener('click', (ev) => {
   const btn = ev.target.closest('[data-action]');
   if (!btn || btn.disabled) return;
   const a = btn.dataset.action;
+  if (a === 'play-song') { playLibrarySong(Number(btn.dataset.position)); return; }
+  if (a === 'toggle-playlist' || a === 'bulk-playlist') {
+    const slot = Number(btn.dataset.slot);
+    const positions = a === 'toggle-playlist' ? [Number(btn.dataset.position)] : filterSongs(candidates().matches, state.songSearch).map(m => m.position);
+    for (const position of positions) {
+      const current = slot === 0 ? !state.removed.has(position) : state.extraSelections[slot - 1].has(position);
+      const checked = a === 'toggle-playlist' ? !current : btn.dataset.checked === 'true';
+      const set = slot === 0 ? state.removed : state.extraSelections[slot - 1];
+      if (slot === 0 ? !checked : checked) set.add(position); else set.delete(position);
+    }
+    const scroll = window.scrollY;
+    render();
+    window.scrollTo(0, scroll);
+    return;
+  }
   if (a === 'preview-song') { playPreview(Number(btn.dataset.position)); return; }
   if (a === 'retry-status' || a === 'reload') loadPlaylists();
   else if (a === 'to-artists') toArtists();
@@ -602,6 +671,12 @@ $app.addEventListener('click', (ev) => {
 
 $app.addEventListener('input', (ev) => {
   const t = ev.target;
+  if (t.dataset.playlistName !== undefined) {
+    const slot = Number(t.dataset.playlistName);
+    if (slot === 0) { state.destName = t.value; state.autoName = ''; }
+    else state.extraNames[slot - 1] = t.value;
+    return;
+  }
   if (t.id === 'search') { state.search = t.value; renderArtistList(); }
   else if (t.id === 'song-search') {
     state.songSearch = t.value;
@@ -614,7 +689,7 @@ $app.addEventListener('input', (ev) => {
   else if (t.id === 'dest') {
     state.destName = t.value;
     state.autoName = '';
-    const problem = nameProblem(t.value);
+    const problem = batchProblem();
     const el = document.getElementById('dest-problem');
     el.hidden = !problem;
     el.textContent = problem || '';

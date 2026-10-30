@@ -120,9 +120,18 @@ export function createMusicAdapter({ platform = process.platform, exec = default
       return runJson('read-playlist.js', [String(id)]);
     },
 
+    async playTrack({ sourceId, position, id }) {
+      return runJson('play-track.js', [String(sourceId), String(position), String(id)]);
+    },
+
+    async pause() {
+      return runJson('pause.js', []);
+    },
+
     async copyTracks({ sourceId, destName, tracks }) {
       const payload = tracks.map((t) => ({ position: t.position, id: t.id }));
       return runJson('copy-tracks.js', [String(sourceId), String(destName), JSON.stringify(payload)], WRITE_TIMEOUT_MS);
     },
   };
 }
+

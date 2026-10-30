@@ -19,6 +19,7 @@
   <aside id="preview-player" class="container" hidden aria-label="Song preview">
     <p id="preview-message" role="status"></p>
     <audio id="preview-audio" controls preload="none"></audio>
+    <button type="button" class="btn btn-sm" id="pause-music">Pause Music</button>
     <a id="preview-source" target="_blank" rel="noopener noreferrer" hidden>Listen on Apple Music</a>
     <button type="button" class="btn btn-sm" id="close-preview">Close preview</button>
   </aside>
@@ -32,11 +33,11 @@
 
   <dialog id="confirm-dialog" aria-labelledby="confirm-title">
     <form method="dialog" id="confirm-form">
-      <h2 id="confirm-title">Create this playlist?</h2>
+      <h2 id="confirm-title">Create selected playlists?</h2>
       <div id="confirm-body"></div>
       <div class="actions">
         <button value="cancel" class="btn">Cancel</button>
-        <button value="ok" class="btn btn-primary" id="confirm-ok">Create playlist and copy</button>
+        <button value="ok" class="btn btn-primary" id="confirm-ok">Create playlists and copy</button>
       </div>
     </form>
   </dialog>
