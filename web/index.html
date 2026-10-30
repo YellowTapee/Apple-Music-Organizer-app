@@ -16,16 +16,14 @@
   </header>
 
   <main id="app" class="container" aria-live="polite"></main>
-  <aside id="preview-player" class="container" hidden aria-label="Song preview">
+  <aside id="preview-player" class="container" hidden aria-label="Apple Music playback">
     <p id="preview-message" role="status"></p>
-    <audio id="preview-audio" controls preload="none"></audio>
     <button type="button" class="btn btn-sm" id="pause-music">Pause Music</button>
-    <a id="preview-source" target="_blank" rel="noopener noreferrer" hidden>Listen on Apple Music</a>
-    <button type="button" class="btn btn-sm" id="close-preview">Close preview</button>
+    <button type="button" class="btn btn-sm" id="close-preview">Hide player</button>
   </aside>
 
   <footer class="container footer">
-    <p>Your source playlist is never changed. Clicking Preview sends that song’s title and artist to Apple to look up a catalog audio clip.</p>
+    <p>Your source playlist is never changed. Play in Music plays the selected track through the Music app on this Mac.</p>
     <p><button type="button" class="link" id="clear-saved">Clear saved selections</button>
       <span class="muted">(clears this tab's choices; organizing progress is kept separately)</span></p>
     <p>Organizing progress stores playlist and copied-song IDs in this browser only. Reset it from the song review screen. No song titles or audio are stored.</p>

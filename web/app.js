@@ -44,54 +44,18 @@ const state = {
 
 const $app = document.getElementById('app');
 const $dialog = document.getElementById('confirm-dialog');
-const previewAudio = document.getElementById('preview-audio');
 let previewRequest = 0;
 
 function closePreview() {
   previewRequest++;
-  previewAudio.pause();
-  previewAudio.removeAttribute('src');
-  previewAudio.load();
   document.getElementById('preview-player').hidden = true;
-}
-
-async function playPreview(position) {
-  const track = state.tracks[position];
-  if (!track) return;
-  closePreview();
-  const request = previewRequest;
-  const panel = document.getElementById('preview-player');
-  const message = document.getElementById('preview-message');
-  const link = document.getElementById('preview-source');
-  panel.hidden = false;
-  link.hidden = true;
-  message.textContent = `Finding preview: ${track.title} — ${track.artist}…`;
-  try {
-    await api('/api/pause', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    if (request !== previewRequest) return;
-    const { preview } = await api('/api/preview?' + new URLSearchParams({ title: track.title || '', artist: track.artist || '', album: track.album || '' }));
-    if (request !== previewRequest) return;
-    if (!preview) { message.textContent = 'Preview unavailable for this song/version.'; return; }
-    message.textContent = `${preview.title} — ${preview.artist} · Apple Music preview`;
-    link.href = preview.trackUrl;
-    link.hidden = false;
-    previewAudio.src = preview.previewUrl;
-    try { await previewAudio.play(); }
-    catch { if (request === previewRequest) message.textContent += ' · Press Play below to listen.'; }
-  } catch (error) {
-    if (request === previewRequest) message.textContent = error.message;
-  }
 }
 document.getElementById('close-preview').addEventListener('click', closePreview);
 document.getElementById('pause-music').addEventListener('click', async () => {
-  previewAudio.pause();
   try {
     await api('/api/pause', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     document.getElementById('preview-message').textContent = 'Playback paused.';
   } catch (e) { document.getElementById('preview-message').textContent = e.message; }
-});
-previewAudio.addEventListener('error', () => {
-  if (previewAudio.hasAttribute('src')) document.getElementById('preview-message').textContent = 'This preview could not be played. Try another song.';
 });
 
 // ---------- helpers ----------
@@ -185,7 +149,6 @@ async function playLibrarySong(position) {
   const request = previewRequest;
   const panel = document.getElementById('preview-player');
   panel.hidden = false;
-  document.getElementById('preview-source').hidden = true;
   const message = document.getElementById('preview-message');
   message.textContent = `Playing in Apple Music: ${track.title} — ${track.artist}…`;
   try {
@@ -370,7 +333,6 @@ function trackRow(m, removable) {
   return `<li class="track"><span class="pos">${m.position + 1}</span>
     <span class="meta"><span class="title">${esc(m.track.title)}${badges}</span>
       <span class="sub">${esc(m.track.artist)}${m.track.album ? ' · ' + esc(m.track.album) : ''}</span></span>
-    <button class="btn btn-sm" data-action="preview-song" data-position="${m.position}" aria-label="Preview ${esc(m.track.title)}">▶ Preview</button>
     <button class="btn btn-sm" data-action="play-song" data-position="${m.position}">▶ Play in Music</button>
     ${removable ? [0, 1, 2].map(i => `<button class="btn btn-sm playlist-toggle" data-action="toggle-playlist" data-slot="${i}" data-position="${m.position}" aria-pressed="${i === 0 ? !state.removed.has(m.position) : state.extraSelections[i - 1].has(m.position)}" aria-label="Include ${esc(m.track.title)} in playlist ${i + 1}">Playlist ${i + 1}</button>`).join('') : ''}</li>`;
 }
@@ -654,7 +616,6 @@ $app.addEventListener('click', (ev) => {
     window.scrollTo(0, scroll);
     return;
   }
-  if (a === 'preview-song') { playPreview(Number(btn.dataset.position)); return; }
   if (a === 'retry-status' || a === 'reload') loadPlaylists();
   else if (a === 'to-artists') toArtists();
   else if (a === 'to-review' && state.selected.size > 0) {
