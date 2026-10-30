@@ -122,7 +122,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
   .actions .btn { flex: 1; }
 }
 
- .playlist-toggle[aria-pressed="true"] { background: #a42649; border-color: #f16b8c; color: #fff; }
+ .playlist-toggle[data-slot="0"][aria-pressed="true"] { background: #81283f; border-color: #c65b78; color: #fff2f5; }
+ .playlist-toggle[data-slot="1"][aria-pressed="true"] { background: #a75079; border-color: #dc91b5; color: #fff5fa; }
+ .playlist-toggle[data-slot="2"][aria-pressed="true"] { background: #365b83; border-color: #7b9fc8; color: #f1f6ff; }
  .playlist-toggle[aria-pressed="false"] { opacity: .75; }
 
 /* Give sorting the screen space it needs; keep other steps compact. */
