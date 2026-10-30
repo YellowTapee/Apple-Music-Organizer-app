@@ -53,3 +53,21 @@ test('empty destinations are skipped and duplicate names cannot be copied', () =
   assert.equal(app.playlistBatches().length, 1);
   assert.equal(app.batchProblem(), null);
 });
+
+test('five playlist slots start independently and the last two create separate destinations', async () => {
+  const requests = [];
+  const app = ui(async (path, options) => {
+    if (path === '/api/playlists') return { ok: true, json: async () => ({ playlists: [] }) };
+    const body = JSON.parse(options.body);
+    requests.push(body);
+    return { ok: true, json: async () => ({ destination: { name: body.destName }, sourceUnchanged: true, results: body.tracks.map(t => ({ position: t.position, status: 'copied' })) }) };
+  });
+  assert.equal(app.state.extraSelections.length, 4);
+  app.state.extraSelections[2].add(0);
+  assert.equal(app.state.extraSelections[3].size, 0);
+  app.state.extraSelections[3].add(0);
+  Object.assign(app.state, { mode: 'songs', playlistId: 'P', tracks: [{ id: 'A', title: 'Song', artist: 'Artist' }], removed: new Set([0]), extraNames: ['', '', 'Four', 'Five'] });
+  await app.doCopy();
+  assert.deepEqual(requests.map(r => r.destName), ['Four', 'Five']);
+  assert.deepEqual(requests.map(r => r.tracks[0].id), ['A', 'A']);
+});

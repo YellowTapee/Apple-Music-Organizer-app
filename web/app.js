@@ -29,8 +29,8 @@ const state = {
   includeFeatured: false,
   duplicates: 'skip',
   removed: new Set(),
-  extraSelections: [new Set(), new Set()],
-  extraNames: ['', ''],
+  extraSelections: Array.from({ length: 4 }, () => new Set()),
+  extraNames: Array(4).fill(''),
   playlistSettingsOpen: false,
   batchReports: null,
   onlyPositions: null, // set when retrying only failed tracks
@@ -403,7 +403,7 @@ function trackRow(m, removable) {
     <span class="meta"><span class="title">${esc(m.track.title)}${badges}</span>
       <span class="sub">${esc(m.track.artist)}${m.track.album ? ' · ' + esc(m.track.album) : ''}</span></span>
     <button class="btn btn-sm" data-action="play-song" data-position="${m.position}">▶ Play in Music</button>
-    ${removable ? [0, 1, 2].map(i => `<button class="btn btn-sm playlist-toggle" data-action="toggle-playlist" data-slot="${i}" data-position="${m.position}" aria-pressed="${i === 0 ? !state.removed.has(m.position) : state.extraSelections[i - 1].has(m.position)}" aria-label="Include ${esc(m.track.title)} in playlist ${i + 1}">Playlist ${i + 1}</button>`).join('') : ''}</li>`;
+    ${removable ? [0, 1, 2, 3, 4].map(i => `<button class="btn btn-sm playlist-toggle" data-action="toggle-playlist" data-slot="${i}" data-position="${m.position}" aria-pressed="${i === 0 ? !state.removed.has(m.position) : state.extraSelections[i - 1].has(m.position)}" aria-label="Include ${esc(m.track.title)} in playlist ${i + 1}">Playlist ${i + 1}</button>`).join('') : ''}</li>`;
 }
 
 function screenReview() {
@@ -425,8 +425,8 @@ function screenReview() {
     ${noId ? `<div class="banner banner-error" role="alert"><b>${noId} track${noId === 1 ? ' has' : 's have'} no Apple Music ID</b> and can't be copied safely. Remove ${noId === 1 ? 'it' : 'them'} to continue.</div>` : ''}
     <details class="card playlist-settings" id="playlist-settings" ${state.playlistSettingsOpen ? 'open' : ''}>
       <summary>Playlist settings <span class="muted">· ${[matches.length, ...state.extraSelections.map(s => available.filter(m => s.has(m.position)).length)].map((count, i) => `Playlist ${i + 1}: ${count}`).join(' · ')}</span></summary>
-      <p class="muted">Name your playlists and select or clear all shown songs. Each song’s three buttons work independently.</p>
-      <div class="playlist-settings-grid">${[0, 1, 2].map(i => `<section><label for="playlist-name-${i}">Playlist ${i + 1} name</label><input type="text" id="playlist-name-${i}" data-playlist-name="${i}" value="${esc(i === 0 ? state.destName : state.extraNames[i - 1])}" maxlength="200" placeholder="Name playlist ${i + 1}"><div class="actions"><button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="true">Select all shown</button><button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="false">Clear shown</button></div></section>`).join('')}</div>
+      <p class="muted">Name your playlists and select or clear all shown songs. Each song’s five buttons work independently.</p>
+      <div class="playlist-settings-grid">${[0, 1, 2, 3, 4].map(i => `<section><label for="playlist-name-${i}">Playlist ${i + 1} name</label><input type="text" id="playlist-name-${i}" data-playlist-name="${i}" value="${esc(i === 0 ? state.destName : state.extraNames[i - 1])}" maxlength="200" placeholder="Name playlist ${i + 1}"><div class="actions"><button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="true">Select all shown</button><button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="false">Clear shown</button></div></section>`).join('')}</div>
     </details>
     <label for="dups">Duplicate tracks</label>
     <select id="dups">
@@ -454,7 +454,7 @@ function screenConfirm() {
       <input type="text" id="dest" value="${esc(state.destName)}" maxlength="200" autocomplete="off" ${state.copying ? 'disabled' : ''}
         aria-describedby="dest-problem">
       <p class="banner banner-error" id="dest-problem" role="alert" ${problem ? '' : 'hidden'}>${esc(problem || '')}</p>
-      <p class="muted">Go Back to change all three names and selections. Playlists with no selections are skipped.</p></div>
+      <p class="muted">Go Back to change all five names and selections. Playlists with no selections are skipped.</p></div>
     <div class="banner banner-info">Your source playlist, <b>${esc(state.sourceName)}</b>, will <b>not</b> be changed. Nothing is deleted.</div>
     <label class="check"><input type="checkbox" id="preview" ${preview ? 'checked' : ''} ${state.copying ? 'disabled' : ''}>
       Preview only: don't create anything in Music</label>
@@ -548,8 +548,8 @@ async function toArtists() {
     state.tracks = data.tracks;
     state.sourceName = data.name;
     state.removed = new Set();
-    state.extraSelections = [new Set(), new Set()];
-    state.extraNames = ['', ''];
+    state.extraSelections = Array.from({ length: 4 }, () => new Set());
+    state.extraNames = Array(4).fill('');
     state.batchReports = null;
     state.onlyPositions = null;
     state.report = null;
@@ -627,8 +627,8 @@ async function doCopy() {
 
 
 function restart() {
-  state.extraSelections = [new Set(), new Set()];
-  state.extraNames = ['', ''];
+  state.extraSelections = Array.from({ length: 4 }, () => new Set());
+  state.extraNames = Array(4).fill('');
   state.batchReports = null;
   state.mode = 'artists';
   state.songSearch = '';
