@@ -71,3 +71,31 @@ test('five playlist slots start independently and the last two create separate d
   assert.deepEqual(requests.map(r => r.destName), ['Four', 'Five']);
   assert.deepEqual(requests.map(r => r.tracks[0].id), ['A', 'A']);
 });
+
+test('a 2200-song source completes all five destinations in source order without dropping overlapping selections', async () => {
+  const requests = [];
+  const app = ui(async (path, options) => {
+    if (path === '/api/playlists') return { ok: true, json: async () => ({ playlists: [] }) };
+    const body = JSON.parse(options.body);
+    requests.push(body);
+    return { ok: true, json: async () => ({ destination: { name: body.destName }, sourceUnchanged: true, results: body.tracks.map(t => ({ position: t.position, status: 'copied' })) }) };
+  });
+  const tracks = Array.from({ length: 2200 }, (_, i) => ({ id: `ID${i}`, title: `Song ${i}`, artist: 'Artist', album: 'Album' }));
+  const original = JSON.stringify(tracks);
+  const groups = Array.from({ length: 5 }, (_, slot) => new Set(tracks.map((_, i) => i).filter(i => i % 5 === slot || i === 0)));
+  Object.assign(app.state, { mode: 'songs', playlistId: 'P', tracks, destName: 'First', extraNames: ['Second', 'Third', 'Fourth', 'Fifth'], removed: new Set(tracks.map((_, i) => i).filter(i => !groups[0].has(i))), extraSelections: groups.slice(1), songSearch: 'Song 2199' });
+  assert.equal(app.batchProblem(), null);
+  await app.doCopy();
+  assert.deepEqual(requests.map(r => r.destName), ['First', 'Second', 'Third', 'Fourth', 'Fifth']);
+  for (let slot = 0; slot < 5; slot++) {
+    assert.deepEqual(requests[slot].tracks.map(t => t.position), [...groups[slot]]);
+    assert.equal(requests[slot].confirm, true);
+    assert.equal(app.state.batchReports[slot].report.status, 'success');
+    assert.equal(app.state.batchReports[slot].report.copiedCount, groups[slot].size);
+  }
+  assert.equal(app.state.step, 5);
+  assert.equal(app.state.copying, false);
+  assert.equal(app.state.organized.P.length, 2200);
+  assert.equal(JSON.parse(app.storage.get(organizing.ORGANIZED_KEY)).P.length, 2200);
+  assert.equal(JSON.stringify(tracks), original);
+});
