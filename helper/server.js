@@ -104,6 +104,16 @@ export function createServer({ adapter = createMusicAdapter(), port = 4173 } = {
         if (req.method === 'GET' && url.pathname === '/api/playlists') {
           return send(res, 200, { playlists: await adapter.listPlaylists() });
         }
+        if (req.method === 'GET' && url.pathname === '/api/playback') {
+          return send(res, 200, await adapter.playback());
+        }
+        if (req.method === 'POST' && (url.pathname === '/api/seek' || url.pathname === '/api/resume')) {
+          if (!String(req.headers['content-type'] || '').startsWith('application/json')) return send(res, 415, { error: { code: 'invalid', message: 'Use application/json' } });
+          const body = await readJson(req);
+          if (writeInFlight) return send(res, 409, { error: { code: 'busy', message: 'Wait for copying to finish.' } });
+          if (typeof body.id !== 'string' || !body.id || (url.pathname === '/api/seek' && (!Number.isFinite(body.seconds) || body.seconds < 0))) return send(res, 400, { error: { code: 'invalid', message: 'Choose a valid song time.' } });
+          return send(res, 200, await adapter.playback(url.pathname === '/api/seek' ? 'seek' : 'resume', body.id, body.seconds));
+        }
         if (req.method === 'POST' && (url.pathname === '/api/play' || url.pathname === '/api/pause')) {
           if (!String(req.headers['content-type'] || '').startsWith('application/json')) return send(res, 415, { error: { code: 'invalid', message: 'Use application/json' } });
           const body = await readJson(req);

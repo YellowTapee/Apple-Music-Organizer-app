@@ -128,6 +128,10 @@ export function createMusicAdapter({ platform = process.platform, exec = default
       return runJson('pause.js', []);
     },
 
+    async playback(action = 'status', id = '', seconds = 0) {
+      return runJson('playback.js', [action, String(id), String(seconds)]);
+    },
+
     async copyTracks({ sourceId, destName, tracks }) {
       const payload = tracks.map((t) => ({ position: t.position, id: t.id }));
       return runJson('copy-tracks.js', [String(sourceId), String(destName), JSON.stringify(payload)], WRITE_TIMEOUT_MS);

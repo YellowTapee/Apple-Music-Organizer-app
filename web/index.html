@@ -18,8 +18,13 @@
   <main id="app" class="container" aria-live="polite"></main>
   <aside id="preview-player" class="container" hidden aria-label="Apple Music playback">
     <p id="preview-message" role="status"></p>
-    <button type="button" class="btn btn-sm" id="pause-music">Pause Music</button>
-    <button type="button" class="btn btn-sm" id="close-preview">Hide player</button>
+    <div class="playback-controls">
+      <button type="button" class="btn btn-sm" id="pause-music">Pause</button>
+      <button type="button" class="btn btn-sm" id="resume-music" disabled>Resume</button>
+      <span id="playback-time" class="muted">0:00 / 0:00</span>
+      <input type="range" id="music-seek" aria-label="Song position" min="0" max="0" value="0" step="1" disabled>
+      <button type="button" class="btn btn-sm" id="close-preview" aria-label="Hide playback controls">×</button>
+    </div>
   </aside>
 
   <footer class="container footer">

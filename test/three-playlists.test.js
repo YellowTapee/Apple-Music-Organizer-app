@@ -10,7 +10,7 @@ function ui(fetch) {
   const nodes = new Map();
   const node = () => ({ addEventListener() {}, pause() {}, load() {}, removeAttribute() {}, hasAttribute() { return false; }, querySelector() { return null; } });
   const storage = new Map();
-  const context = vm.createContext({ ...matching, ...reports, ...organizing, Set, Map, URLSearchParams, fetch,
+  const context = vm.createContext({ ...matching, ...reports, ...organizing, Set, Map, URLSearchParams, fetch, setTimeout, clearTimeout,
     document: { getElementById(id) { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); } },
     window: { addEventListener() {}, scrollTo() {} },
     localStorage: { setItem(k, v) { storage.set(k, v); }, getItem(k) { return storage.get(k) || null; } },

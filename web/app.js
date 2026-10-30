@@ -45,17 +45,86 @@ const state = {
 const $app = document.getElementById('app');
 const $dialog = document.getElementById('confirm-dialog');
 let previewRequest = 0;
+let playbackTimer = null;
+let playback = null;
+let seeking = false;
+let playbackRevision = 0;
+const seekBar = document.getElementById('music-seek');
+const timeLabel = document.getElementById('playback-time');
+const timeText = seconds => `${Math.floor(Math.max(0, seconds) / 60)}:${String(Math.floor(Math.max(0, seconds) % 60)).padStart(2, '0')}`;
+
+function updatePlayback(data) {
+  playback = data;
+  if (!seeking) {
+    seekBar.max = Math.floor(data.duration || 0);
+    seekBar.value = Math.floor(data.position || 0);
+    timeLabel.textContent = `${timeText(data.position)} / ${timeText(data.duration)}`;
+  }
+  seekBar.disabled = !(data.duration > 0);
+  document.getElementById('resume-music').disabled = data.playing;
+  document.getElementById('pause-music').disabled = !data.playing;
+  document.getElementById('preview-message').textContent = `${data.title} — ${data.artist}`;
+}
+
+async function pollPlayback(request) {
+  const revision = playbackRevision;
+  try {
+    const data = await api('/api/playback');
+    if (request !== previewRequest) return;
+    if (revision === playbackRevision) updatePlayback(data);
+  } catch (e) {
+    if (request !== previewRequest) return;
+    document.getElementById('preview-message').textContent = e.message;
+  }
+  if (request === previewRequest) playbackTimer = setTimeout(() => pollPlayback(request), 1500);
+}
+
+seekBar.addEventListener('input', () => {
+  seeking = true;
+  timeLabel.textContent = `${timeText(Number(seekBar.value))} / ${timeText(playback?.duration || 0)}`;
+});
+seekBar.addEventListener('change', async () => {
+  if (!playback) { seeking = false; return; }
+  const request = previewRequest;
+  playbackRevision++;
+  const revision = playbackRevision;
+  try {
+    const data = await api('/api/seek', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: playback.id, seconds: Number(seekBar.value) }) });
+    if (request === previewRequest && revision === playbackRevision) { seeking = false; updatePlayback(data); }
+  } catch (e) {
+    if (request === previewRequest && revision === playbackRevision) { seeking = false; document.getElementById('preview-message').textContent = e.message; }
+  }
+});
+document.getElementById('resume-music').addEventListener('click', async () => {
+  if (!playback) return;
+  const request = previewRequest;
+  playbackRevision++;
+  try {
+    const data = await api('/api/resume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: playback.id }) });
+    if (request === previewRequest) updatePlayback(data);
+  } catch (e) { if (request === previewRequest) document.getElementById('preview-message').textContent = e.message; }
+});
 
 function closePreview() {
   previewRequest++;
+  clearTimeout(playbackTimer);
+  playback = null;
+  seeking = false;
+  seekBar.disabled = true;
+  seekBar.max = 0;
+  seekBar.value = 0;
+  timeLabel.textContent = '0:00 / 0:00';
+  document.getElementById('resume-music').disabled = true;
   document.getElementById('preview-player').hidden = true;
 }
 document.getElementById('close-preview').addEventListener('click', closePreview);
 document.getElementById('pause-music').addEventListener('click', async () => {
+  const request = previewRequest;
+  playbackRevision++;
   try {
     await api('/api/pause', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    document.getElementById('preview-message').textContent = 'Playback paused.';
-  } catch (e) { document.getElementById('preview-message').textContent = e.message; }
+    if (request === previewRequest && playback) updatePlayback({ ...playback, playing: false });
+  } catch (e) { if (request === previewRequest) document.getElementById('preview-message').textContent = e.message; }
 });
 
 // ---------- helpers ----------
@@ -153,7 +222,7 @@ async function playLibrarySong(position) {
   message.textContent = `Playing in Apple Music: ${track.title} — ${track.artist}…`;
   try {
     await api('/api/play', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceId: state.playlistId, position, id: track.id }) });
-    if (request === previewRequest) message.textContent = `Playing in Apple Music: ${track.title} — ${track.artist}`;
+    if (request === previewRequest) { message.textContent = `${track.title} — ${track.artist}`; pollPlayback(request); }
   } catch (e) { if (request === previewRequest) message.textContent = e.message; }
 }
 
