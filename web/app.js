@@ -31,6 +31,7 @@ const state = {
   removed: new Set(),
   extraSelections: [new Set(), new Set()],
   extraNames: ['', ''],
+  playlistSettingsOpen: false,
   batchReports: null,
   onlyPositions: null, // set when retrying only failed tracks
   destName: '',
@@ -389,10 +390,13 @@ function screenReview() {
     <p class="muted">Organized songs are hidden here after successful copying. They stay in Apple Music. This progress is saved only in this browser on this Mac.</p>
     ${state.storageWarning ? `<p role="alert">${esc(state.storageWarning)}</p>` : ''}
     ${organizedCount ? '<button class="btn btn-sm" data-action="reset-organized">Reset organizing progress for this playlist</button>' : ''}
-    <div class="card"><p>Choose up to three new playlists. A highlighted button includes that song; click again to remove it. Songs can go in more than one.</p>
-    ${[0, 1, 2].map(i => `<label for="playlist-name-${i}">Playlist ${i + 1} name</label><input id="playlist-name-${i}" data-playlist-name="${i}" value="${esc(i === 0 ? state.destName : state.extraNames[i - 1])}" maxlength="200" placeholder="Name playlist ${i + 1}"><p class="muted">${i === 0 ? matches.length : available.filter(m => state.extraSelections[i - 1].has(m.position)).length} songs selected</p><button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="true">Select all shown for ${i + 1}</button> <button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="false">Clear shown for ${i + 1}</button>`).join('')}</div>
     ${uncertain ? `<div class="banner banner-warn" role="status"><b>${uncertain} uncertain match${uncertain === 1 ? '' : 'es'}.</b> Their artist name has more than one name in it (for example “A &amp; B”). Check them, and remove any that don't belong.</div>` : ''}
     ${noId ? `<div class="banner banner-error" role="alert"><b>${noId} track${noId === 1 ? ' has' : 's have'} no Apple Music ID</b> and can't be copied safely. Remove ${noId === 1 ? 'it' : 'them'} to continue.</div>` : ''}
+    <details class="card playlist-settings" id="playlist-settings" ${state.playlistSettingsOpen ? 'open' : ''}>
+      <summary>Playlist settings <span class="muted">· ${[matches.length, ...state.extraSelections.map(s => available.filter(m => s.has(m.position)).length)].map((count, i) => `Playlist ${i + 1}: ${count}`).join(' · ')}</span></summary>
+      <p class="muted">Name your playlists and select or clear all shown songs. Each song’s three buttons work independently.</p>
+      <div class="playlist-settings-grid">${[0, 1, 2].map(i => `<section><label for="playlist-name-${i}">Playlist ${i + 1} name</label><input type="text" id="playlist-name-${i}" data-playlist-name="${i}" value="${esc(i === 0 ? state.destName : state.extraNames[i - 1])}" maxlength="200" placeholder="Name playlist ${i + 1}"><div class="actions"><button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="true">Select all shown</button><button class="btn btn-sm" data-action="bulk-playlist" data-slot="${i}" data-checked="false">Clear shown</button></div></section>`).join('')}</div>
+    </details>
     <label for="dups">Duplicate tracks</label>
     <select id="dups">
       <option value="skip" ${state.duplicates === 'skip' ? 'selected' : ''}>Skip duplicates (keep the first copy)</option>
@@ -401,7 +405,7 @@ function screenReview() {
     ${skippedDuplicates.length ? `<p class="muted">${skippedDuplicates.length} duplicate${skippedDuplicates.length === 1 ? '' : 's'} will be skipped.</p>` : ''}
     <p class="muted">${shown.length} songs shown. Search filters the list without clearing your selections.</p>
     ${shown.length === 0 ? '<div class="empty"><p>No songs shown. Clear the search, show organized songs, or change artists.</p></div>' : ''}
-    <ul class="list" aria-label="Matching tracks">${shown.map((m) => trackRow(m, true)).join('')}</ul>
+    <ul class="list song-list" tabindex="0" aria-label="Matching tracks">${shown.map((m) => trackRow(m, true)).join('')}</ul>
     <div class="actions"><button class="btn" data-action="back">Back</button>
       <span class="spacer"></span>
       <button class="btn btn-primary" data-action="to-confirm" ${playlistBatches().length === 0 || noId ? 'disabled' : ''}>Continue</button></div>`;
@@ -482,11 +486,15 @@ function screenResults() {
 // ---------- render ----------
 
 function render() {
+  const songScroll = $app.querySelector('.song-list')?.scrollTop || 0;
   document.getElementById('clear-saved').disabled = state.copying;
   renderSteps();
   renderConnection();
   const screens = { 1: screenPlaylist, 2: screenArtists, 3: screenReview, 4: screenConfirm, 5: screenResults };
+  $app.className = state.step === 3 ? 'container review-wide' : 'container';
   $app.innerHTML = screens[state.step]();
+  const songList = $app.querySelector('.song-list');
+  if (songList) songList.scrollTop = songScroll;
   if (state.step === 2) renderArtistList();
 }
 
@@ -622,6 +630,10 @@ function retryFailed() {
 }
 
 // ---------- events ----------
+
+$app.addEventListener('toggle', (ev) => {
+  if (ev.target.id === 'playlist-settings' && ev.target.isConnected) state.playlistSettingsOpen = ev.target.open;
+}, true);
 
 $app.addEventListener('click', (ev) => {
   const btn = ev.target.closest('[data-action]');

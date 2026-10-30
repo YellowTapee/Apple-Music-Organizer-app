@@ -124,3 +124,19 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 
  .playlist-toggle[aria-pressed="true"] { background: #a42649; border-color: #f16b8c; color: #fff; }
  .playlist-toggle[aria-pressed="false"] { opacity: .75; }
+
+/* Give sorting the screen space it needs; keep other steps compact. */
+#app.review-wide { max-width: 1440px; padding-left: 24px; padding-right: 24px; }
+.review-wide .song-list { height: 78vh; height: 78dvh; max-height: none; min-height: 320px; scrollbar-gutter: stable; }
+.review-wide .track .meta { min-width: 240px; }
+.playlist-settings { padding: 12px 16px; }
+.playlist-settings summary { cursor: pointer; font-weight: 600; min-height: 32px; padding: 4px 0; }
+.playlist-settings[open] summary { margin-bottom: 12px; }
+.playlist-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.playlist-settings-grid .actions { justify-content: flex-start; margin-top: 10px; }
+@media (max-width: 760px) {
+  #app.review-wide { padding-left: 12px; padding-right: 12px; }
+  .playlist-settings-grid { grid-template-columns: 1fr; gap: 12px; }
+  .review-wide .track .meta { min-width: calc(100% - 60px); }
+  .playlist-settings summary .muted { display: block; }
+}
