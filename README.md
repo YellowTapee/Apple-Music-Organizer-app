@@ -4,10 +4,10 @@ A private, local-first tool for one person's Apple Music library. Pick an existi
 playlist, pick artists, review the matching songs, and copy them into a **new**
 playlist. The source playlist is only ever read.
 
-**Status: partial.** The matching logic, UI and helper are built and tested with
-fake data. The Mac scripts that actually talk to Apple Music **have not yet been
-run against a real library**. See [docs/VERIFICATION.md](docs/VERIFICATION.md) for
-exactly what is and isn't proven.
+**Status: initial Mac proof of concept confirmed by the owner.** Reading a real
+playlist and copying selected tracks into a new playlist worked; the owner also
+confirmed the source stayed unchanged. The website flow and launcher still need
+testing on the owner's Mac. iPhone syncing is not yet confirmed.
 
 ## Platform boundary (read this first)
 
@@ -28,6 +28,18 @@ No Apple Developer membership, MusicKit or cloud account is used.
 ## Run it (on your Mac)
 
 Requires Node 20+.
+
+For everyday use, double-click **Open Organizer.command** in Finder. It opens
+Music, starts the helper, and opens the website automatically. Keep the Terminal
+window it opens running while using the app. No commands are needed after launch.
+Closing the browser alone does not stop the helper. Avoid closing the helper
+window while a copy is running; wait for its results first.
+
+After pulling this update into an existing checkout, the launcher is ready to use.
+If macOS blocks opening it, use Finder's Open action and review the security prompt.
+Do not disable macOS security settings globally.
+
+You can also start the website manually:
 
 ```bash
 npm start
@@ -135,3 +147,4 @@ The matching module is independent of the UI, so a second tab can be added later
 - Max 5,000 tracks per copy; names up to 200 characters.
 - Smart playlists can be read as a source; special system playlists are hidden.
 - Cancel is possible before confirming; once copying starts it can't be stopped.
+

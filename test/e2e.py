@@ -115,10 +115,14 @@ def main():
         check("review shows 5 matching tracks", page.locator("ul[aria-label='Matching tracks'] li").count() == 5)
         order = page.locator(".track .pos").all_text_contents()
         check("original playlist order preserved", order == sorted(order, key=int), str(order))
-        page.click("[data-action=remove] >> nth=0")
-        check("removing a track updates the count", page.locator("ul[aria-label='Matching tracks'] li").count() == 4)
-        page.click("[data-action=restore]")
-        check("restore brings it back", page.locator("ul[aria-label='Matching tracks'] li").count() == 5)
+        page.locator('[data-track-position]').first.uncheck()
+        check("unchecking preserves the song for reselection", page.locator('[data-track-position]:checked').count() == 4 and page.locator('[data-track-position]').count() == 5)
+        page.click('[data-action=deselect-all-tracks]')
+        check("deselect all blocks continuation", page.locator('[data-track-position]:checked').count() == 0 and page.locator('[data-action=to-confirm]').is_disabled())
+        page.locator('[data-track-position]').first.check()
+        check("one song can be selected individually", page.locator('[data-track-position]:checked').count() == 1)
+        page.click('[data-action=select-all-tracks]')
+        check("select all checks every matching song", page.locator('[data-track-position]:checked').count() == 5)
         shot(page, "3-review")
 
         page.click("[data-action=to-confirm]")
@@ -308,3 +312,4 @@ if __name__ == "__main__":
     finally:
         for server in LIVE:
             server.stop()
+

@@ -265,17 +265,20 @@ function trackRow(m, removable) {
   return `<li class="track"><span class="pos">${m.position + 1}</span>
     <span class="meta"><span class="title">${esc(m.track.title)}${badges}</span>
       <span class="sub">${esc(m.track.artist)}${m.track.album ? ' · ' + esc(m.track.album) : ''}</span></span>
-    ${removable ? `<button class="btn btn-sm" data-action="remove" data-position="${m.position}" aria-label="Remove ${esc(m.track.title)}">Remove</button>` : ''}</li>`;
+    ${removable ? `<label class="check"><input type="checkbox" data-track-position="${m.position}" ${state.removed.has(m.position) ? '' : 'checked'} aria-label="Include ${esc(m.track.title)}">Include</label>` : ''}</li>`;
 }
 
 function screenReview() {
   const { matches, skippedDuplicates } = computeMatches();
+  const available = matchTracks(state.tracks, [...state.selected], {
+    includeFeatured: state.includeFeatured, duplicates: state.duplicates,
+  }).matches;
   const uncertain = matches.filter((m) => m.uncertain).length;
   const noId = matches.filter((m) => !m.track.id).length;
   return `<h2 tabindex="-1">Review matching songs</h2>
     ${sourceCard()}
-    <p><b>${matches.length}</b> matching track${matches.length === 1 ? '' : 's'}, in original playlist order.
-      ${state.removed.size ? `<span class="muted">${state.removed.size} removed by you.</span>` : ''}</p>
+    <p><b>${matches.length}</b> of ${available.length} matching songs selected, in original playlist order.</p>
+    <p class="muted">Check the songs you want in your new playlist. Unchecked songs stay here so you can select them again.</p>
     ${uncertain ? `<div class="banner banner-warn" role="status"><b>${uncertain} uncertain match${uncertain === 1 ? '' : 'es'}.</b> Their artist name has more than one name in it (for example “A &amp; B”). Check them, and remove any that don't belong.</div>` : ''}
     ${noId ? `<div class="banner banner-error" role="alert"><b>${noId} track${noId === 1 ? ' has' : 's have'} no Apple Music ID</b> and can't be copied safely. Remove ${noId === 1 ? 'it' : 'them'} to continue.</div>` : ''}
     <label for="dups">Duplicate tracks</label>
@@ -284,11 +287,11 @@ function screenReview() {
       <option value="allow" ${state.duplicates === 'allow' ? 'selected' : ''}>Allow duplicates</option>
     </select>
     ${skippedDuplicates.length ? `<p class="muted">${skippedDuplicates.length} duplicate${skippedDuplicates.length === 1 ? '' : 's'} will be skipped.</p>` : ''}
-    ${matches.length === 0
-      ? `<div class="empty"><p><b>No songs to copy.</b></p><p>${state.removed.size ? 'You removed every match.' : 'None of the selected artists have tracks in this playlist with the current options.'} Go back to change your selection.</p></div>`
-      : `<ul class="list" aria-label="Matching tracks">${matches.map((m) => trackRow(m, true)).join('')}</ul>`}
+    ${available.length === 0
+      ? '<div class="empty"><p>No matching songs. Go back to change your artists.</p></div>'
+      : `<div class="actions"><button class="btn" data-action="select-all-tracks">Select all</button><button class="btn" data-action="deselect-all-tracks">Deselect all</button></div>
+        <ul class="list" aria-label="Matching tracks">${available.map((m) => trackRow(m, true)).join('')}</ul>`}
     <div class="actions"><button class="btn" data-action="back">Back</button>
-      ${state.removed.size ? '<button class="btn" data-action="restore">Restore removed</button>' : ''}
       <span class="spacer"></span>
       <button class="btn btn-primary" data-action="to-confirm" ${matches.length === 0 || noId ? 'disabled' : ''}>Continue</button></div>`;
 }
@@ -361,6 +364,7 @@ function screenResults() {
 // ---------- render ----------
 
 function render() {
+  document.getElementById('clear-saved').disabled = state.copying;
   renderSteps();
   renderConnection();
   const screens = { 1: screenPlaylist, 2: screenArtists, 3: screenReview, 4: screenConfirm, 5: screenResults };
@@ -504,8 +508,8 @@ $app.addEventListener('click', (ev) => {
   else if (a === 'to-confirm') toConfirm();
   else if (a === 'back') go(state.step - 1);
   else if (a === 'back-to-confirm') { state.previewShown = null; go(4); }
-  else if (a === 'remove') { state.removed.add(Number(btn.dataset.position)); render(); }
-  else if (a === 'restore') { state.removed = new Set(); render(); }
+  else if (a === 'select-all-tracks') { state.removed = new Set(); render(); }
+  else if (a === 'deselect-all-tracks') { state.removed = new Set(state.tracks.map((_, i) => i)); render(); }
   else if (a === 'copy') startCopy();
   else if (a === 'retry-failed') retryFailed();
   else if (a === 'restart') restart();
@@ -527,6 +531,13 @@ $app.addEventListener('input', (ev) => {
 
 $app.addEventListener('change', (ev) => {
   const t = ev.target;
+  if (t.dataset.trackPosition !== undefined) {
+    const position = Number(t.dataset.trackPosition);
+    if (t.checked) state.removed.delete(position); else state.removed.add(position);
+    render();
+    $app.querySelector(`[data-track-position="${position}"]`)?.focus();
+    return;
+  }
   if (t.id === 'playlist') { state.playlistId = t.value; state.tracksError = null; save(); render(); $app.querySelector('#playlist')?.focus(); }
   else if (t.dataset.artist !== undefined) {
     if (t.checked) state.selected.add(t.dataset.artist); else state.selected.delete(t.dataset.artist);
@@ -542,11 +553,17 @@ $dialog.addEventListener('close', () => {
 });
 
 document.getElementById('clear-saved').addEventListener('click', () => {
+  if (state.copying) return;
   try { sessionStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
-  state.selected = new Set();
-  state.playlistId = '';
-  render();
+  restart();
+});
+
+window.addEventListener('beforeunload', (event) => {
+  if (!state.copying) return;
+  event.preventDefault();
+  event.returnValue = '';
 });
 
 load();
 loadPlaylists();
+

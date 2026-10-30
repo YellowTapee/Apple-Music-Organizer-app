@@ -85,6 +85,9 @@ export function createServer({ adapter = createMusicAdapter(), port = 4173 } = {
           return send(res, 403, { error: { code: 'bad-origin', message: 'Cross-origin requests are not allowed' } });
         }
 
+        if (req.method === 'GET' && url.pathname === '/api/health') {
+          return send(res, 200, { app: 'apple-music-organizer', version: 1 });
+        }
         if (req.method === 'GET' && url.pathname === '/api/status') {
           return send(res, 200, await adapter.status());
         }
@@ -149,3 +152,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log('Local only. Nothing leaves this computer.');
   });
 }
+
