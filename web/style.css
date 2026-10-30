@@ -1,41 +1,21 @@
 :root {
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --text: #15171a;
-  --muted: #5b6370;
-  --border: #d9dde3;
-  --focus: #1a5fd0;
-  --source: #1a5fd0;
-  --source-bg: #e8f0fd;
-  --dest: #0d7a43;
-  --dest-bg: #e3f6ec;
-  --danger: #b3261e;
-  --danger-bg: #fdeceb;
-  --warn: #8a5a00;
-  --warn-bg: #fff4d6;
-  --primary: #15171a;
+  --bg: #150f12;
+  --surface: #21181d;
+  --text: #f5eef1;
+  --muted: #b4a6ad;
+  --border: #44333c;
+  --focus: #ff94b0;
+  --source: #e5bbc9;
+  --source-bg: #322029;
+  --dest: #9cddbc;
+  --dest-bg: #182d25;
+  --danger: #ffa9b2;
+  --danger-bg: #3e1b26;
+  --warn: #f3d097;
+  --warn-bg: #36291f;
+  --primary: #e63763;
   --primary-text: #ffffff;
-  color-scheme: light dark;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #101214;
-    --surface: #1a1d21;
-    --text: #eceef1;
-    --muted: #a0a7b3;
-    --border: #2f343b;
-    --focus: #7aa7ff;
-    --source: #8db3ff;
-    --source-bg: #16243d;
-    --dest: #5fd49a;
-    --dest-bg: #12291f;
-    --danger: #ff8a80;
-    --danger-bg: #331614;
-    --warn: #ffd37a;
-    --warn-bg: #33270b;
-    --primary: #eceef1;
-    --primary-text: #101214;
-  }
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -47,7 +27,7 @@ body {
 }
 .container { max-width: 760px; margin: 0 auto; padding: 16px; }
 h1 { font-size: 1.1rem; margin: 0; }
-h2 { font-size: 1.35rem; margin: 8px 0 4px; }
+h2 { font-size: clamp(1.6rem, 4vw, 2.1rem); letter-spacing: -0.035em; margin: 8px 0 12px; }
 h2:focus { outline: none; }
 p { margin: 4px 0 12px; }
 .muted { color: var(--muted); font-size: 0.9rem; }
@@ -104,6 +84,11 @@ select, input[type="text"], input[type="search"] {
 .check { display: flex; align-items: center; gap: 10px; font-weight: 500; margin: 10px 0; cursor: pointer; }
 
 .track { flex-direction: row; }
+.track label.check { flex: 0 0 auto; font-size: 0.85rem; }
+.track:has(input:checked) { background: #2a1b23; }
+input[type="checkbox"] { accent-color: var(--primary); }
+#app.container { margin-top: 24px; margin-bottom: 24px; }
+.btn-primary:hover:not(:disabled) { background: #c92d54; border-color: #ff94b0; }
 .track .meta { flex: 1; min-width: 0; }
 .track .title, .track .sub { display: block; }
 .track .title { font-weight: 600; overflow-wrap: anywhere; }
@@ -131,3 +116,5 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
   .container { padding: 12px; }
   .actions .btn { flex: 1; }
 }
+
+
