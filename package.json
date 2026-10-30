@@ -1,0 +1,15 @@
+{
+  "name": "apple-music-organizer-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal, local-first Apple Music artist playlist sorter. Copies selected artists' tracks from an existing playlist into a new one; never modifies the source.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node helper/server.js",
+    "selftest": "node helper/selftest.js",
+    "test": "node --test \"test/*.test.js\""
+  }
+}

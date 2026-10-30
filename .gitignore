@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+*.log
+# Never commit real library data or test output
+selftest-*.txt
+selftest-*.md
+shots/
+.env

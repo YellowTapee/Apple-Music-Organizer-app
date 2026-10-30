@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Artist Playlist Sorter</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <h1>Artist Playlist Sorter</h1>
+      <div id="connection" class="pill pill-muted" role="status" aria-live="polite">Checking Music…</div>
+    </div>
+    <ol id="steps" class="steps" aria-label="Progress"></ol>
+  </header>
+
+  <main id="app" class="container" aria-live="polite"></main>
+
+  <footer class="container footer">
+    <p>Local only: nothing leaves this computer. Your source playlist is never changed.</p>
+    <p><button type="button" class="link" id="clear-saved">Clear saved selections</button>
+      <span class="muted">(only playlist/artist choices for this browser tab are remembered, never track data)</span></p>
+  </footer>
+
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <form method="dialog" id="confirm-form">
+      <h2 id="confirm-title">Create this playlist?</h2>
+      <div id="confirm-body"></div>
+      <div class="actions">
+        <button value="cancel" class="btn">Cancel</button>
+        <button value="ok" class="btn btn-primary" id="confirm-ok">Create playlist and copy</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
