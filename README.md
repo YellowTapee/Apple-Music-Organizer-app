@@ -27,6 +27,21 @@ No Apple Developer membership, MusicKit or cloud account is used.
 
 ## Run it (on your Mac)
 
+### Picking songs and tracking progress
+
+Choose a source playlist, then either select artists or use **Browse all songs**.
+The song review screen shows titles, artists and albums, with individual checkboxes.
+Search by artist or song title; selections remain checked as you change the search.
+**Select all shown** and **Deselect all shown** affect only the filtered results.
+Browse-all starts with nothing selected; artist mode starts with matching songs checked.
+
+After a successful copy, copied-song IDs are saved per source playlist in this
+browser's localStorage. Those songs are hidden on later visits. Failed copies and
+preview-only runs never mark a song organized. Enable **Show organized songs** to
+select those songs again for another playlist. Reset progress from the review screen.
+Clearing browser data loses progress; using another browser does not share it.
+This does not change the source playlist or delete any song in Apple Music.
+
 Requires Node 20+.
 
 For everyday use, double-click **Open Organizer.command** in Finder. It opens
@@ -133,7 +148,8 @@ web/ (UI)  ->  helper/server.js (127.0.0.1 only)  ->  helper/music-adapter.js  -
 - Everything stays on your Mac. No analytics, accounts, servers or uploads.
 - The browser tab remembers only your last playlist choice, selected artist names and two
   options, in `sessionStorage` (cleared when the tab closes, or with "Clear saved
-  selections"). Track data is never saved.
+  selections"). Organizing progress separately saves source-playlist and copied-song
+  IDs in localStorage until reset. Titles, artists and audio are never stored.
 - No credentials or tokens exist in this repo.
 
 ## Not included (by design)

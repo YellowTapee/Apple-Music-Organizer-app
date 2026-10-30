@@ -4,6 +4,7 @@
 
 import { listArtists, matchTracks, normalize, REASONS } from '/src/matching.js';
 import { buildReport, failedMatches } from '/src/report.js';
+import { allTracks, filterSongs, readOrganized, recordCopied, ORGANIZED_KEY } from '/src/organizing.js';
 
 const STEPS = ['Playlist', 'Artists', 'Review', 'Confirm', 'Results'];
 const SAVE_KEY = 'artist-playlist-sorter/v1';
@@ -19,6 +20,11 @@ const state = {
   sourceName: '',
   tracks: [],
   search: '',
+  songSearch: '',
+  mode: 'artists',
+  showOrganized: false,
+  organized: {},
+  storageWarning: '',
   selected: new Set(),
   includeFeatured: false,
   duplicates: 'skip',
@@ -81,11 +87,18 @@ function load() {
   } catch { /* ignore corrupt data */ }
 }
 
-function computeMatches() {
-  const result = matchTracks(state.tracks, [...state.selected], {
+function candidates() {
+  const result = state.mode === 'songs' ? allTracks(state.tracks, state.duplicates) : matchTracks(state.tracks, [...state.selected], {
     includeFeatured: state.includeFeatured,
     duplicates: state.duplicates,
   });
+  const hidden = new Set(state.organized[state.playlistId] || []);
+  const visible = (m) => state.showOrganized || !hidden.has(String(m.track.id));
+  return { matches: result.matches.filter(visible), skippedDuplicates: result.skippedDuplicates.filter(visible) };
+}
+
+function computeMatches() {
+  const result = candidates();
   let matches = result.matches.filter((m) => !state.removed.has(m.position));
   if (state.onlyPositions) matches = matches.filter((m) => state.onlyPositions.has(m.position));
   return { matches, skippedDuplicates: result.skippedDuplicates };
@@ -102,6 +115,7 @@ function uniqueName(base) {
 }
 
 function defaultDestName() {
+  if (state.mode === 'songs') return uniqueName(`${state.sourceName} — Selected songs`.slice(0, 190));
   const names = [...state.selected];
   const who = names.length <= 2 ? names.join(' + ') : `${names.length} artists`;
   return uniqueName(`${who} (from ${state.sourceName})`.slice(0, 190));
@@ -224,6 +238,7 @@ function screenArtists() {
   const shown = q ? artists.filter((a) => normalize(a.name).includes(q)) : artists;
   return `<h2 tabindex="-1">Choose artists</h2>
     ${sourceCard()}
+    <div class="card"><p>Want to pick songs directly?</p><button class="btn" data-action="browse-songs">Browse all songs</button></div>
     <label for="search">Search artists</label>
     <input type="search" id="search" value="${esc(state.search)}" placeholder="Type to filter" autocomplete="off">
     <label class="check"><input type="checkbox" id="featured" ${state.includeFeatured ? 'checked' : ''}>
@@ -270,13 +285,19 @@ function trackRow(m, removable) {
 
 function screenReview() {
   const { matches, skippedDuplicates } = computeMatches();
-  const available = matchTracks(state.tracks, [...state.selected], {
-    includeFeatured: state.includeFeatured, duplicates: state.duplicates,
-  }).matches;
+  const available = candidates().matches;
+  const shown = filterSongs(available, state.songSearch);
+  const organizedCount = state.tracks.filter(t => (state.organized[state.playlistId] || []).includes(String(t.id))).length;
   const uncertain = matches.filter((m) => m.uncertain).length;
   const noId = matches.filter((m) => !m.track.id).length;
   return `<h2 tabindex="-1">Review matching songs</h2>
     ${sourceCard()}
+    <label for="song-search">Search songs or artists</label>
+    <input type="search" id="song-search" value="${esc(state.songSearch)}" placeholder="Song title, artist, or album" autocomplete="off">
+    <label class="check"><input type="checkbox" id="show-organized" ${state.showOrganized ? 'checked' : ''}>Show organized songs (${organizedCount})</label>
+    <p class="muted">Organized songs are hidden here after successful copying. They stay in Apple Music. This progress is saved only in this browser on this Mac.</p>
+    ${state.storageWarning ? `<p role="alert">${esc(state.storageWarning)}</p>` : ''}
+    ${organizedCount ? '<button class="btn btn-sm" data-action="reset-organized">Reset organizing progress for this playlist</button>' : ''}
     <p><b>${matches.length}</b> of ${available.length} matching songs selected, in original playlist order.</p>
     <p class="muted">Check the songs you want in your new playlist. Unchecked songs stay here so you can select them again.</p>
     ${uncertain ? `<div class="banner banner-warn" role="status"><b>${uncertain} uncertain match${uncertain === 1 ? '' : 'es'}.</b> Their artist name has more than one name in it (for example “A &amp; B”). Check them, and remove any that don't belong.</div>` : ''}
@@ -287,10 +308,10 @@ function screenReview() {
       <option value="allow" ${state.duplicates === 'allow' ? 'selected' : ''}>Allow duplicates</option>
     </select>
     ${skippedDuplicates.length ? `<p class="muted">${skippedDuplicates.length} duplicate${skippedDuplicates.length === 1 ? '' : 's'} will be skipped.</p>` : ''}
-    ${available.length === 0
-      ? '<div class="empty"><p>No matching songs. Go back to change your artists.</p></div>'
-      : `<div class="actions"><button class="btn" data-action="select-all-tracks">Select all</button><button class="btn" data-action="deselect-all-tracks">Deselect all</button></div>
-        <ul class="list" aria-label="Matching tracks">${available.map((m) => trackRow(m, true)).join('')}</ul>`}
+    <div class="actions"><button class="btn" data-action="select-all-tracks">${state.songSearch ? 'Select all shown' : 'Select all'}</button><button class="btn" data-action="deselect-all-tracks">${state.songSearch ? 'Deselect all shown' : 'Deselect all'}</button></div>
+    <p class="muted">${shown.length} songs shown. Search filters the list without clearing your selections.</p>
+    ${shown.length === 0 ? '<div class="empty"><p>No songs shown. Clear the search, show organized songs, or change artists.</p></div>' : ''}
+    <ul class="list" aria-label="Matching tracks">${shown.map((m) => trackRow(m, true)).join('')}</ul>
     <div class="actions"><button class="btn" data-action="back">Back</button>
       <span class="spacer"></span>
       <button class="btn btn-primary" data-action="to-confirm" ${matches.length === 0 || noId ? 'disabled' : ''}>Continue</button></div>`;
@@ -348,6 +369,7 @@ function screenResults() {
       ? '<div class="banner banner-error" role="alert"><b>Warning: the source playlist looks different from before.</b> This app never edits it, but please open Music and check it.</div>'
       : '<div class="banner banner-warn">The helper could not verify that the source playlist is unchanged. Please check it in Music.</div>';
   return `<h2 tabindex="-1">Results</h2>
+    ${state.storageWarning ? `<p role="alert">${esc(state.storageWarning)}</p>` : ''}
     <div class="banner ${head[0]}" role="status"><b>${head[1]}</b></div>
     ${r.destination ? `<div class="card dest"><span class="tag tag-dest">New playlist</span><p class="name">${esc(r.destination.name)}</p></div>` : ''}
     <div class="stats"><div class="stat"><b>${r.copiedCount}</b>copied</div><div class="stat"><b>${r.skippedCount}</b>skipped (duplicates)</div><div class="stat"><b>${r.failedCount}</b>failed</div></div>
@@ -394,6 +416,8 @@ async function toArtists() {
     state.report = null;
     state.previewShown = null;
     state.search = '';
+    state.songSearch = '';
+    state.mode = 'artists';
     const known = new Set(listArtists(state.tracks, { includeFeatured: true }).map((a) => a.name));
     state.selected = new Set([...state.selected].filter((n) => known.has(n)));
     state.tracksLoading = false;
@@ -455,6 +479,9 @@ async function doCopy() {
       }),
     });
     state.report = buildReport({ requested: matches, skippedDuplicates, helperResult });
+    state.organized = recordCopied(state.organized, state.playlistId, state.report.copied);
+    try { localStorage.setItem(ORGANIZED_KEY, JSON.stringify(state.organized)); }
+    catch { state.storageWarning = 'Progress could not be saved. Keep this tab open; organized songs may reappear next time.'; }
     state.copying = false;
     // The new playlist now exists; refresh the list so name checks stay correct.
     api('/api/playlists').then((p) => { state.playlists = p.playlists; }).catch(() => {});
@@ -468,6 +495,8 @@ async function doCopy() {
 }
 
 function restart() {
+  state.mode = 'artists';
+  state.songSearch = '';
   state.tracks = [];
   state.selected = new Set();
   state.removed = new Set();
@@ -504,12 +533,25 @@ $app.addEventListener('click', (ev) => {
   const a = btn.dataset.action;
   if (a === 'retry-status' || a === 'reload') loadPlaylists();
   else if (a === 'to-artists') toArtists();
-  else if (a === 'to-review' && state.selected.size > 0) { save(); go(3); }
+  else if (a === 'to-review' && state.selected.size > 0) {
+    if (state.mode !== 'artists') state.removed = new Set();
+    state.mode = 'artists'; save(); go(3);
+  }
+  else if (a === 'browse-songs') { state.mode = 'songs'; state.removed = new Set(state.tracks.map((_, i) => i)); state.songSearch = ''; state.onlyPositions = null; go(3); }
   else if (a === 'to-confirm') toConfirm();
   else if (a === 'back') go(state.step - 1);
   else if (a === 'back-to-confirm') { state.previewShown = null; go(4); }
-  else if (a === 'select-all-tracks') { state.removed = new Set(); render(); }
-  else if (a === 'deselect-all-tracks') { state.removed = new Set(state.tracks.map((_, i) => i)); render(); }
+  else if (a === 'select-all-tracks' || a === 'deselect-all-tracks') {
+    for (const m of filterSongs(candidates().matches, state.songSearch)) {
+      if (a === 'select-all-tracks') state.removed.delete(m.position); else state.removed.add(m.position);
+    }
+    render();
+  }
+  else if (a === 'reset-organized' && window.confirm('Reset the website’s organizing progress for this playlist? Apple Music will not change.')) {
+    state.organized = { ...state.organized, [state.playlistId]: [] };
+    try { localStorage.setItem(ORGANIZED_KEY, JSON.stringify(state.organized)); } catch { state.storageWarning = 'Progress could not be saved.'; }
+    render();
+  }
   else if (a === 'copy') startCopy();
   else if (a === 'retry-failed') retryFailed();
   else if (a === 'restart') restart();
@@ -518,6 +560,14 @@ $app.addEventListener('click', (ev) => {
 $app.addEventListener('input', (ev) => {
   const t = ev.target;
   if (t.id === 'search') { state.search = t.value; renderArtistList(); }
+  else if (t.id === 'song-search') {
+    state.songSearch = t.value;
+    const position = t.selectionStart;
+    render();
+    const input = document.getElementById('song-search');
+    input.focus();
+    if (position != null) input.setSelectionRange(position, position);
+  }
   else if (t.id === 'dest') {
     state.destName = t.value;
     state.autoName = '';
@@ -531,6 +581,7 @@ $app.addEventListener('input', (ev) => {
 
 $app.addEventListener('change', (ev) => {
   const t = ev.target;
+  if (t.id === 'show-organized') { state.showOrganized = t.checked; render(); return; }
   if (t.dataset.trackPosition !== undefined) {
     const position = Number(t.dataset.trackPosition);
     if (t.checked) state.removed.delete(position); else state.removed.add(position);
@@ -564,6 +615,7 @@ window.addEventListener('beforeunload', (event) => {
   event.returnValue = '';
 });
 
+try { state.organized = readOrganized(localStorage); } catch { /* storage blocked */ }
 load();
 loadPlaylists();
 
