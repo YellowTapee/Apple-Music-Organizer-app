@@ -219,6 +219,118 @@ Suggested screens:
 4. Name and Confirm
 5. Results
 
+## Claude's complete responsibility
+
+Claude should handle the initial implementation across the following areas.
+
+### Repository and architecture
+
+- Inspect every relevant existing file before changing the project.
+- Identify the current framework, build system, entry points, styling system, and deployment setup.
+- Preserve the repository's existing conventions where reasonable.
+- Choose a minimal architecture suitable for a private single-user app.
+- Keep Apple Music integration isolated behind a clear adapter/service boundary.
+- Keep the future #430 playlist-comparison feature possible without building it now.
+- Avoid introducing a backend, account system, or dependency that is not necessary.
+- Add a clear local development and testing README section if missing.
+- Keep the app easy for another developer to understand.
+
+### UI and design
+
+- Build the full select, review, confirm, and results flow.
+- Create polished Mac and iPhone-responsive layouts.
+- Use accessible labels, keyboard navigation, focus states, and sufficient contrast.
+- Make primary and destructive actions visually distinct.
+- Add loading skeletons or clear loading indicators where useful.
+- Add empty states that explain what the user should do next.
+- Add actionable error messages rather than generic errors.
+- Make the source playlist and new destination playlist visually unmistakable.
+- Keep copy concise and understandable.
+- Avoid decorative complexity, unnecessary dashboards, and fake statistics.
+
+### Frontend behavior
+
+- Implement playlist, artist, track, selection, and operation-result state.
+- Preserve selections when moving backward through the flow.
+- Disable invalid actions.
+- Prevent double submissions.
+- Handle cancellation safely.
+- Handle partial success without losing the operation report.
+- Keep preview mode separate from write mode.
+- Validate playlist names and selected-track counts.
+- Avoid losing data during refreshes or errors.
+- Make retry behavior safe and explicit.
+
+### Apple Music and Mac-helper work
+
+- Investigate AppleScript, JXA, and Shortcuts.
+- Prototype the smallest real playlist-reading operation.
+- Prototype artist matching using real metadata.
+- Prototype creation of a new regular playlist.
+- Prototype copying tracks without modifying the source.
+- Detect whether Music is open and whether permission is available.
+- Produce clear machine-readable results for copied, skipped, and failed tracks.
+- Isolate platform-specific code from the UI.
+- Document exact macOS permissions and setup steps.
+- If a browser cannot perform an operation, make that limitation visible and provide the correct local-helper path.
+- Never simulate a successful write as if it were real.
+
+### Data and matching logic
+
+- Normalize artist/title/album metadata safely.
+- Prefer stable Apple Music identifiers where available.
+- Implement primary-artist matching.
+- Implement opt-in featured-artist matching.
+- Preserve playlist order.
+- Implement simple duplicate handling.
+- Mark ambiguous matches for review.
+- Create deterministic matching tests with sample fixtures.
+- Keep the matching logic independent from the visual components.
+
+### Testing and quality
+
+- Add unit tests for matching logic.
+- Add tests for primary versus featured artists.
+- Add tests for duplicate behavior.
+- Add tests for source-playlist immutability.
+- Add tests for ordering.
+- Add tests for empty and no-match playlists.
+- Add tests for special characters and unusual metadata.
+- Test permission denied, Music closed, and operation failure states.
+- Test a failure halfway through copying.
+- Test a large playlist for performance and usable rendering.
+- Test responsive layouts on Mac-sized and iPhone-sized screens.
+- Run the project's available lint, typecheck, build, and test commands.
+- Fix warnings and errors caused by the new work.
+- Do not declare success based only on a screenshot or mock data.
+
+### Documentation and handoff
+
+- Document what was actually implemented.
+- Document what was tested with real Apple Music data.
+- Document what remains blocked or unverified.
+- Document required Mac permissions.
+- Document how to run the app locally.
+- Document how to run the tests.
+- Record any assumptions.
+- Do not claim iPhone-only operation if a Mac is required.
+- Do not claim MusicKit or API access unless it was actually configured and tested.
+- At the end, provide a concise changed-files summary, test results, known limitations, and next recommended step.
+
+### GitHub handoff
+
+When the work is complete:
+
+- Save all actual changes in this repository.
+- Commit the changes with a clear commit message.
+- Push them to the repository's current branch.
+- Do not only paste code into chat.
+- Do not modify another repository.
+- Do not commit secrets or local personal data.
+- Report the commit hash.
+- Report whether the implementation is complete, partial, or blocked.
+- Clearly separate tested functionality from planned functionality.
+
 ## Engineering expectations
 
 - Inspect the repository before choosing the architecture.
